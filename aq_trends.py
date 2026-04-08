@@ -2,19 +2,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 class aq_trend:
-    def __init__(self, aq_data):
+    def __init__(self, aq_data, pollutant):
         self.__aq_data = aq_data
+        self.pollutant = pollutant
     def arrange_format(self):
         self.__aq_data['value'] = pd.to_numeric(self.__aq_data['value'], errors='coerce')
+        self.__aq_data['lat'] = pd.to_numeric(self.__aq_data['lat'], errors='coerce')
         self.__aq_data['timestamp'] = pd.to_datetime(self.__aq_data['timestamp'], format='ISO8601')
     def sort_aq_index(self):
         self.__aq_data.set_index('timestamp', inplace = True)
         self.__aq_data= self.__aq_data.sort_index()
     def group_pollutant(self):
-        pollutant = input('Choose Pollutant: (1). P1\n(2). P2\n')
         grouped_aq_values = self.__aq_data.groupby('value_type').resample('D')[['value']].mean().groupby(level=0).rolling(window=3).mean()
         grouped_aq_values.dropna(inplace = True)
-        self.p_df = grouped_aq_values.xs(pollutant, level=1)
+        self.p_df = grouped_aq_values.xs(self.pollutant, level=1)
         self.p_df = self.p_df.reset_index(level=0, drop=True)
     def plot_trend(self):
         aqi_levels = [
