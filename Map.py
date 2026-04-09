@@ -9,7 +9,7 @@ class AQMapTrend:
         self.__daily_data = None
 
     def load_and_format(self):
-        self.__aq_data = pd.read_csv(self.__filepath, sep=";")
+        self.__aq_data = pd.read_csv(self.__filepath, sep=";", low_memory = False)
         self.__aq_data["value"]     = pd.to_numeric(self.__aq_data["value"],  errors="coerce")
         self.__aq_data["lat"]       = pd.to_numeric(self.__aq_data["lat"],    errors="coerce")
         self.__aq_data["lon"]       = pd.to_numeric(self.__aq_data["lon"],    errors="coerce")
@@ -59,7 +59,7 @@ class AQMapTrend:
         for date in dates:
             sub = df[df["date_str"] == date]
             traces.append(
-                go.Scattermapbox(
+                go.Scattermap(
                     lat=sub["lat"],
                     lon=sub["lon"],
                     mode="markers",
@@ -138,7 +138,7 @@ class AQMapTrend:
 
         fig = go.Figure(data=traces, layout=layout)
         fig.write_html(output_html)
-        print(f"Map saved → {output_html}")
+        print(f"Map saved to {output_html}")
         fig.show()
 
 
@@ -155,4 +155,4 @@ if __name__ == "__main__":
     aq_map = AQMapTrend(filepath)
     aq_map.load_and_format()
     aq_map.aggregate(pollutant=pollutant)
-    aq_map.plot_map(output_html="aq_map.html")
+    aq_map.plot_map(output_html="aq_map1.html")
