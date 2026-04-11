@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 import requests
 
-air_quality_data = pd.read_csv(r"C:\Users\victo\OneDrive\Documents\Combined CSV Files\combined_6_months_nakuru.csv",sep = ';', low_memory = False)
+air_quality_data = pd.read_csv(r"C:\Users\victo\OneDrive\Documents\Combined CSV Files\combined_6_months_nairobi.csv",sep = ';', low_memory = False)
 
 url = "https://data.humdata.org/api/3/action/datastore_search"
 
@@ -33,6 +33,7 @@ kenya_rain = kenya_rainfall.kenya_rain(rain_data)
 kenya_format = kenya_rain.format_rain_data()
 kenya_plot = kenya_rain.rain_trend_plot()
 kenya_bar = kenya_rain.rain_bar_chart()
+kenya_rain_map = kenya_rain.rain_map()
 
 map = Map.AQMapTrend(r"C:\Users\victo\OneDrive\Documents\Combined CSV Files\combined_6_months_nairobi.csv")
 map_lf = map.load_and_format()
