@@ -3,43 +3,50 @@ import json
 import pandas as pd
 import plotly.express as px
 
-client = OpenAQ(api_key='f2341992e796fa02ab9f4776986c518e3985b1877fdbe547eaade6132f0bb790')
 
-res = client.parameters.latest(parameters_id=2)
-data_string = res.json()
-data_string
+class air_q_map:
+    def __init__(self, api_key: str):
+        self.__client = OpenAQ(api_key=api_key)
 
-world_aq_data = json.loads(data_string)
-world_aq_data
+    def format_data(self):
+        res = self.__client.parameters.latest(parameters_id=2)
+        world_aq_data = json.loads(res.json())
+        world_aq_df = pd.json_normalize(world_aq_data["results"])
 
-world_aq_df = pd.json_normalize(world_aq_data['results'])
-world_aq_df.dropna(inplace=True)
-world_aq_df['datetime.utc'] = pd.to_datetime(world_aq_df['datetime.utc'], 
-                                                     format="ISO8601", utc = True)
-world_aq_df['datetime.local'] = pd.to_datetime(world_aq_df['datetime.local'], 
-                                                      format="ISO8601", utc = True)
-df_clean = world_aq_df[world_aq_df['value'] >= 0]
+        world_aq_df["datetime.utc"]   = pd.to_datetime(world_aq_df["datetime.utc"],   format="ISO8601", utc=True)
+        world_aq_df["datetime.local"] = pd.to_datetime(world_aq_df["datetime.local"], format="ISO8601", utc=True)
+        self.df_clean = world_aq_df[world_aq_df["value"] >= 0]
 
-color_map = {
-    "Good": "#00e400",
-    "Moderate": "#ffff00",
-    "Unhealthy for Sensitive Groups": "#ff7e00",
-    "Unhealthy": "#ff0000",
-    "Very Unhealthy": "#8f3f97",
-    "Hazardous": "#7e0023"
-}
-
-fig = px.scatter_geo(
-    df_clean,
-    lat="coordinates.latitude",
-    lon="coordinates.longitude",
-    color="value",                 
-    size="value",                  
-    size_max=20,                   
-    hover_name="locationsId",      
-    hover_data=["value"],
-    color_discrete_map=color_map,                                
-    projection="natural earth",
-    title="OpenAQ Air Quality Measurements"
-)
-fig.show()
+    def plot_map(self) -> px.scatter_geo:
+        """Return a dark-themed Plotly world scatter-geo figure."""
+        fig = px.scatter_geo(
+            self.df_clean,
+            lat="coordinates.latitude",
+            lon="coordinates.longitude",
+            color="value",
+            size="value",
+            size_max=22,
+            hover_name="locationsId",
+            hover_data=["value"],
+            projection="natural earth",
+            title="OpenAQ — Global Air Quality (PM₂.₅)",
+            color_continuous_scale=["#00e400", "#ffff00", "#ff7e00",
+                                    "#ff0000", "#8f3f97", "#7e0023"],
+            template="plotly_dark",
+        )
+        fig.update_layout(
+            paper_bgcolor="#0d0d1a",
+            geo=dict(
+                bgcolor="#12122a",
+                showland=True,  landcolor="#1a1a2e",
+                showocean=True, oceancolor="#0d0d1a",
+                showcoastlines=True, coastlinecolor="#2a2a4a",
+                showframe=False,
+            ),
+            font_color="white",
+            title_font_size=16,
+            coloraxis_colorbar=dict(title="PM₂.₅ (µg/m³)", tickfont=dict(color="white")),
+            margin=dict(l=0, r=0, t=50, b=0),
+            height=600,
+        )
+        return fig
