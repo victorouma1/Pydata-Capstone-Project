@@ -4,12 +4,12 @@ import matplotlib.ticker as ticker
 
 
 AQI_LEVELS = [
-    ("Good",                          0,     9,     "#00e400"),
-    ("Moderate",                      9.1,   35.4,  "#ffff00"),
-    ("Unhealthy for Sensitive Groups", 35.5, 55.4,  "#ff7e00"),
-    ("Unhealthy",                     55.5,  125.4, "#ff0000"),
-    ("Very Unhealthy",                125.5, 225.4, "#8f3f97"),
-    ("Hazardous",                     225.5, 325.4, "#7e0023"),
+    ("Good",                           0,     9,     "#00e400"),  
+    ("Moderate",                       9.1,   35.4,  "#ffe600"),  
+    ("Unhealthy for Sensitive Groups", 35.5,  55.4,  "#ff8c00"),  
+    ("Unhealthy",                      55.5,  125.4, "#ff2020"),  
+    ("Very Unhealthy",                 125.5, 225.4, "#cc44ff"),  
+    ("Hazardous",                      225.5, 325.4, "#ff00aa"),  
 ]
 
 DARK_BG   = "#0d0d1a"
@@ -48,12 +48,12 @@ class aq_trend:
 
 
     def plot_trend(self) -> plt.Figure:
-        """Return a dark-themed Matplotlib figure (Streamlit-ready)."""
         fig, ax = plt.subplots(figsize=(12, 6), facecolor=DARK_BG)
         ax.set_facecolor(PANEL_BG)
 
         for label, lo, hi, color in AQI_LEVELS:
-            ax.axhspan(lo, hi, facecolor=color, alpha=0.18, label=label)
+            ax.axhspan(lo, hi, facecolor=color, alpha=0.38, label=label)
+            ax.axhline(lo, color=color, linewidth=0.6, alpha=0.55, linestyle=":")
 
 
         ax.plot(
@@ -86,3 +86,4 @@ class aq_trend:
 
         fig.tight_layout()
         return fig
+    

@@ -10,7 +10,6 @@ import requests
 import aq_trends as aqt
 import kenya_rainfall as kr
 import Map
-import aq_map as aqm
 
 st.set_page_config(
     page_title="AQ & Rainfall Dashboard",
@@ -157,7 +156,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["Nairobi AQ Map", "AQ Trends", "Kenya Rainfall", "World AQ"],
+        ["Nairobi AQ Map", "AQ Trends", "Kenya Rainfall"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -167,16 +166,19 @@ with st.sidebar:
                              help="P1 = PM₁₀  |  P2 = PM₂.₅")
 
     st.markdown("---")
-    aq_csv = st.text_input("CSV path", value="combined_6_months_nairobi.csv",
-                            help="Semicolon-delimited Nairobi AQ CSV")
-    openaq_key = st.text_input("OpenAQ API key", type="password",
-                                value="", help="Required for World AQ tab")
+    st.markdown("**Data Source**")
+    csv_county = st.text_input(
+        "County name", value="nairobi",
+        help="e.g. nairobi, meru, kisumu"
+    ).strip().lower().replace(" ", "_")
+    csv_duration = st.radio("Duration", ["6 months", "Years"], horizontal=True)
+    if csv_duration == "6 months":
+        aq_csv = f"combined_6_months_{csv_county}.csv"
+    else:
+        csv_years = st.number_input("Number of years", min_value=1, max_value=20, value=1, step=1)
+        aq_csv = f"combined_{csv_years}_year_{csv_county}.csv"
+    st.caption(f"`{aq_csv}`")
 
-    st.markdown(
-        "<p style='color:#7a7aaa;font-size:0.65rem;margin-top:1.5rem;"
-        "text-align:center;'>Built with Streamlit ⚡</p>",
-        unsafe_allow_html=True,
-    )
 
 
 @st.cache_data(show_spinner=False)
@@ -240,7 +242,13 @@ elif page == "AQ Trends":
                 trend.group_pollutant()
                 fig = trend.plot_trend()
                 st.pyplot(fig, use_container_width=True)
-
+                st.markdown("""
+> **Generally speaking,** daily air quality in Nairobi typically fluctuates between good and moderate levels.
+>
+> **Main cause of pollution:** A large number of vehicles, including cars, motorbikes and trucks, many of which are older and produce far more pollution than their newer counterparts would.
+>
+> **Way to improve pollution level:** The introduction of fines and charges to both vehicles and factories that exceed dangerous levels of pollutive output, with the eventual replacement of these vehicles with cleaner ones to reducing the amounts of haze, smog, fumes and smoke permeating the air in Nairobi.
+""")
                 # Quick stats
                 st.markdown("---")
                 st.markdown("### Quick Stats")
@@ -249,7 +257,7 @@ elif page == "AQ Trends":
                 c1.metric("Mean",    f"{series.mean():.1f} µg/m³")
                 c2.metric("Max",     f"{series.max():.1f} µg/m³")
                 c3.metric("Min",     f"{series.min():.1f} µg/m³")
-                c4.metric("Std Dev", f"{series.std():.1f} µg/m³")
+                #c4.metric("Std Dev", f"{series.std():.1f} µg/m³")
 
             except FileNotFoundError:
                 st.error(f"CSV not found: `{aq_csv}`.")
@@ -295,43 +303,40 @@ elif page == "Kenya Rainfall":
         if st.button("Plot Trend", key="btn_rain_trend"):
             fig = rain.rain_trend_plot(county=selected_county)
             st.pyplot(fig, use_container_width=True)
+            st.markdown("""
+> The Long Rains (March to May): These are usually the highest peaks in a normal year.
+> 
+> The Short Rains (October to December): These appear as the secondary, slightly lower peaks on the graph.
+""")
 
     with tab_bar:
         direction = st.radio("Show", ["Top 5", "Bottom 5"], horizontal=True, key="rain_dir")
         if st.button("Plot Bar Chart", key="btn_rain_bar"):
             fig = rain.rain_bar_chart(top=(direction == "Top 5"))
             st.plotly_chart(fig, use_container_width=True)
+            st.markdown("""
+> The top 5 rainfall counties in Kenya are all located in the western highlands region
+>                      
+> While the bottom five rainfall counties are all located in northern Kenya's arid and semi-arid regions
+""")
 
     with tab_map:
         if st.button("Show Choropleth Map", key="btn_rain_map"):
             try:
                 fig = rain.rain_map()
                 st.plotly_chart(fig, use_container_width=True)
+                st.markdown("""
+> Western Kenya — Indicating the highest rainfall in the country, Consistent with the influence of Lake Victoria and equatorial weather systems.
+>                        
+> Southern & Coastal Kenya (near Mombasa) — Reflecting high rainfall typical of the coastal strip influenced by the Indian Ocean monsoon.
+>                            
+> Central Kenya — Suggesting moderate rainfall which is consistent with the highland climate.
+>                           
+> Northern & Eastern Kenya — Darker teal shades indicating lower rainfall consistent with the arid and semi-arid lands (ASAL) that dominate this region.
+>
+> Black patches — Represents missing data.
+""")
             except Exception as e:
                 st.error(f"Map error: {e}. Ensure `kenyan-counties.geojson` is present.")
 
 
-elif page == "World AQ":
-    st.title("Global Air Quality Map")
-    st.markdown("Live PM₂.₅ readings from the OpenAQ network.")
-    st.markdown("---")
-
-    if not openaq_key:
-        st.warning("Enter your **OpenAQ API key** in the sidebar to load data.")
-    else:
-        if st.button("Fetch & Plot World Map"):
-            with st.spinner("Querying OpenAQ …"):
-                try:
-                    world = aqm.air_q_map(api_key=openaq_key)
-                    world.format_data()
-                    fig = world.plot_map()
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    # Summary stats
-                    st.markdown("---")
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Stations",   f"{len(world.df_clean):,}")
-                    c2.metric("Mean PM₂.₅", f"{world.df_clean['value'].mean():.1f} µg/m³")
-                    c3.metric("Max PM₂.₅",  f"{world.df_clean['value'].max():.1f} µg/m³")
-                except Exception as e:
-                    st.error(f"OpenAQ error: {e}")
