@@ -35,7 +35,7 @@ In the dataset note that P0 in the data represents PM1, P2 represents PM2.5, and
 
 ### Research Questions
 Which regions in Kenya have the highest pollution levels? <br>
-How does rainfall vary across counties? <br>
+How does rainfall vary across counties over time? <br>
 Is there a relationship between urbanization and pollution? <br>
 Which areas are most vulnerable to climate extremes? <br>
 

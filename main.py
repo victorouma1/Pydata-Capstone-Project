@@ -10,6 +10,7 @@ import requests
 import aq_trends as aqt
 import kenya_rainfall as kr
 import Map
+import urbanisation as urb
 
 st.set_page_config(
     page_title="AQ & Rainfall Dashboard",
@@ -49,7 +50,6 @@ h2 { color: var(--neon-pink) !important; text-shadow: 0 0 12px rgba(255,45,120,.
 h3 { color: var(--text-main) !important; }
 
 /* ── Body / labels ── */
-/* AFTER */
 body, p, label, div { font-family: 'Space Mono', monospace; }
 label, .stTextInput label, .stSelectbox label { color: var(--text-main) !important; font-size: 0.8rem; }
 [data-testid="stSidebar"] label { color: var(--text-main) !important; }
@@ -156,7 +156,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["Nairobi AQ Map", "AQ Trends", "Kenya Rainfall"],
+        ["Kenya AQ Map", "AQ Trends", "Kenya Rainfall", "Urbanisation"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -180,15 +180,17 @@ with st.sidebar:
     st.caption(f"`{aq_csv}`")
 
 
-
 @st.cache_data(show_spinner=False)
 def load_aq_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep=";", low_memory=False)
 
 
-if page == "Nairobi AQ Map":
-    st.title("Nairobi Air Quality Map")
-    st.markdown("Sensor readings across Nairobi with a **date slider** to scrub through time.")
+# ══════════════════════════════════════════════════════════════════════════════
+# Page: Kenya AQ Map
+# ══════════════════════════════════════════════════════════════════════════════
+if page == "Kenya AQ Map":
+    st.title("Kenya Air Quality Map")
+    st.markdown("Sensor readings across Kenya with a **date slider** to scrub through time.")
     st.markdown("---")
 
     col_load, _ = st.columns([1, 3])
@@ -202,7 +204,7 @@ if page == "Nairobi AQ Map":
                 aq_map_obj = Map.AQMapTrend(aq_csv)
                 aq_map_obj.load_and_format()
                 aq_map_obj.aggregate(pollutant=pollutant)
-                fig = aq_map_obj.plot_map()          # returns go.Figure
+                fig = aq_map_obj.plot_map()
                 st.session_state["map_fig"] = fig
             except FileNotFoundError:
                 st.error(f"CSV not found: `{aq_csv}`. Update the path in the sidebar.")
@@ -215,16 +217,20 @@ if page == "Nairobi AQ Map":
             config={"scrollZoom": True},
         )
 
-    # AQI reference card
     with st.expander("AQI Reference", expanded=False):
         aqi_data = {
-            "Category":      ["Good", "Moderate", "Unhealthy — Sensitive", "Unhealthy", "Very Unhealthy", "Hazardous"],
-            "PM₂.₅ (µg/m³)":["0 – 9", "9.1 – 35.4", "35.5 – 55.4", "55.5 – 125.4", "125.5 – 225.4", "225.5 – 325.4"],
-            "Colour":        ["🟢", "🟡", "🟠", "🔴", "🟣", "⬛"],
+            "Category":       ["Good", "Moderate", "Unhealthy — Sensitive",
+                               "Unhealthy", "Very Unhealthy", "Hazardous"],
+            "PM₂.₅ (µg/m³)": ["0 – 9", "9.1 – 35.4", "35.5 – 55.4",
+                               "55.5 – 125.4", "125.5 – 225.4", "225.5 – 325.4"],
+            "Colour":         ["🟢", "🟡", "🟠", "🔴", "🟣", "⬛"],
         }
         st.table(pd.DataFrame(aqi_data))
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Page: AQ Trends
+# ══════════════════════════════════════════════════════════════════════════════
 elif page == "AQ Trends":
     st.title("Air Quality Trends")
     st.markdown("3-day rolling average overlaid on AQI colour bands.")
@@ -245,19 +251,20 @@ elif page == "AQ Trends":
                 st.markdown("""
 > **Generally speaking,** daily air quality in Nairobi typically fluctuates between good and moderate levels.
 >
-> **Main cause of pollution:** A large number of vehicles, including cars, motorbikes and trucks, many of which are older and produce far more pollution than their newer counterparts would.
+> The main source of Nairobi's PM2.5 concentrations is road transport (40%). This is primarily due to the presence of a large and aged vehicle fleet, inadequate road networks, and poorly enforced vehicle emission standards. Despite accounting for only about 9 percent of the population, the city hosts over a third of the country's about 3m vehicle fleet.[1]
 >
 > **Way to improve pollution level:** The introduction of fines and charges to both vehicles and factories that exceed dangerous levels of pollutive output, with the eventual replacement of these vehicles with cleaner ones to reducing the amounts of haze, smog, fumes and smoke permeating the air in Nairobi.
+>
+[1] Clean Air Fund - Nairobi and air pollution
 """)
-                # Quick stats
+
                 st.markdown("---")
                 st.markdown("### Quick Stats")
                 c1, c2, c3, c4 = st.columns(4)
                 series = trend.p_df["value"]
-                c1.metric("Mean",    f"{series.mean():.1f} µg/m³")
-                c2.metric("Max",     f"{series.max():.1f} µg/m³")
-                c3.metric("Min",     f"{series.min():.1f} µg/m³")
-                #c4.metric("Std Dev", f"{series.std():.1f} µg/m³")
+                c1.metric("Mean", f"{series.mean():.1f} µg/m³")
+                c2.metric("Max",  f"{series.max():.1f} µg/m³")
+                c3.metric("Min",  f"{series.min():.1f} µg/m³")
 
             except FileNotFoundError:
                 st.error(f"CSV not found: `{aq_csv}`.")
@@ -266,6 +273,9 @@ elif page == "AQ Trends":
                          "Check the pollutant selector in the sidebar.")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Page: Kenya Rainfall
+# ══════════════════════════════════════════════════════════════════════════════
 elif page == "Kenya Rainfall":
     st.title("Kenya Rainfall Dashboard")
     st.markdown("County-level rainfall data sourced from OCHA/Humdata.")
@@ -305,8 +315,10 @@ elif page == "Kenya Rainfall":
             st.pyplot(fig, use_container_width=True)
             st.markdown("""
 > The Long Rains (March to May): These are usually the highest peaks in a normal year.
-> 
-> The Short Rains (October to December): These appear as the secondary, slightly lower peaks on the graph.
+>
+> The Short Rains (October to December): These appear as the secondary, slightly lower peaks on the graph. [2]
+>
+> [2] Kenya Meteorological Society - CLIMATE OUTLOOK FOR THE "LONG RAINS" (MARCH-MAY) 2026 SEASON AND REVIEW OF THE OCTOBER-DECEMBER 2025 "SHORT RAINS" SEASON
 """)
 
     with tab_bar:
@@ -315,9 +327,11 @@ elif page == "Kenya Rainfall":
             fig = rain.rain_bar_chart(top=(direction == "Top 5"))
             st.plotly_chart(fig, use_container_width=True)
             st.markdown("""
-> The top 5 rainfall counties in Kenya are all located in the western highlands region
->                      
-> While the bottom five rainfall counties are all located in northern Kenya's arid and semi-arid regions
+> The top 5 rainfall counties in Kenya are all located in the western highlands region [3]
+>
+> While the bottom five rainfall counties are all located in northern Kenya's arid and semi-arid regions [4]
+>
+> [4] IUCN - Kenya (ASAL)
 """)
 
     with tab_map:
@@ -326,12 +340,12 @@ elif page == "Kenya Rainfall":
                 fig = rain.rain_map()
                 st.plotly_chart(fig, use_container_width=True)
                 st.markdown("""
-> Western Kenya — Indicating the highest rainfall in the country, Consistent with the influence of Lake Victoria and equatorial weather systems.
->                        
+> Western Kenya — Indicating the highest rainfall in the country, consistent with the influence of Lake Victoria and equatorial weather systems.
+>
 > Southern & Coastal Kenya (near Mombasa) — Reflecting high rainfall typical of the coastal strip influenced by the Indian Ocean monsoon.
->                            
+>
 > Central Kenya — Suggesting moderate rainfall which is consistent with the highland climate.
->                           
+>
 > Northern & Eastern Kenya — Darker teal shades indicating lower rainfall consistent with the arid and semi-arid lands (ASAL) that dominate this region.
 >
 > Black patches — Represents missing data.
@@ -340,3 +354,93 @@ elif page == "Kenya Rainfall":
                 st.error(f"Map error: {e}. Ensure `kenyan-counties.geojson` is present.")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Page: Urbanisation
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "Urbanisation":
+    st.title("Urbanisation & Air Pollution")
+    st.markdown(
+        "Visualises how the **degree of urbanisation** (GHS-DUG DEGURBA 2026) "
+        "relates to PM₂.₅ and PM₁₀ concentrations across Kenya."
+    )
+    st.markdown("---")
+
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("**Urbanisation Settings**")
+        l1_path = st.text_input(
+            "L1 raster path",
+            value="KEN_DUG_2026_GRID_L1_R2025A_v1.tif",
+            help="3-class DEGURBA GeoTIFF",
+        )
+        l2_path = st.text_input(
+            "L2 raster path",
+            value="KEN_DUG_2026_GRID_L2_R2025A_v1.tif",
+            help="9-class DEGURBA GeoTIFF",
+        )
+        use_sensor_aq = st.checkbox(
+            "Use sensor AQ data", value=True,
+            help="When checked, the currently selected CSV is matched to the raster. "
+                 "Uncheck to use literature reference values instead.",
+        )
+
+    col_run, _ = st.columns([1, 3])
+    with col_run:
+        run_urb = st.button("Generate Figure")
+
+    if run_urb:
+        aq_path_for_urb = aq_csv if use_sensor_aq else None
+        with st.spinner("Loading grids and computing statistics …"):
+            try:
+                urb_obj = urb.UrbanisationPollution(
+                    l1_tif=l1_path,
+                    l2_tif=l2_path,
+                    aq_csv=aq_path_for_urb,
+                )
+                urb_obj.load_grids()
+                urb_obj.load_aq_data()
+                fig = urb_obj.make_figure()
+                st.session_state["urb_fig"] = fig
+                st.session_state["urb_source"] = urb_obj.data_source
+            except FileNotFoundError as e:
+                st.error(
+                    f"Raster file not found: {e}. "
+                    "Check the L1/L2 paths in the Urbanisation Settings above."
+                )
+                st.stop()
+            except Exception as e:
+                st.error(f"Error generating figure: {e}")
+                st.stop()
+
+    if "urb_fig" in st.session_state:
+        st.pyplot(st.session_state["urb_fig"], use_container_width=True)
+
+        src = st.session_state.get("urb_source", "")
+        st.caption(f"**Data source:** {src}")
+        st.markdown("---")
+
+        st.markdown("""
+> **Rural areas** show the lowest pollution levels, reflecting limited traffic and industrial activity.
+>
+> **Towns and suburbs** exhibit moderate concentrations driven by growing vehicle fleets and localised industry.
+>
+> **Cities** (primarily Nairobi) record the highest values — often exceeding WHO 24-hour guidelines for both PM₂.₅ (15 µg/m³) and PM₁₀ (45 µg/m³).
+>
+> The uplift annotations on the gradient chart quantify the PM₂.₅ increase between each urbanisation tier.
+>
+> [5] GHS-DUG DEGURBA R2025A v1 — European Commission Joint Research Centre / WorldPop
+""")
+
+        with st.expander("Urbanisation Class Reference", expanded=False):
+            cls_data = {
+                "Level": ["L1", "L1", "L1",
+                          "L2", "L2", "L2", "L2", "L2", "L2", "L2", "L2"],
+                "Code":  [1, 2, 3, 10, 11, 12, 13, 21, 22, 23, 30],
+                "Label": [
+                    "Rural", "Town / Suburb", "City",
+                    "Very Sparse Rural", "Low Density Rural", "Rural Cluster",
+                    "Peri-urban / Suburb", "Semi-dense Urban", "Dense Urban",
+                    "Urban Centre", "Major City Core",
+                ],
+            }
+            st.table(pd.DataFrame(cls_data))

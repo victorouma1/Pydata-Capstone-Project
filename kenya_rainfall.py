@@ -19,7 +19,6 @@ class kenya_rain:
         self._pcodes_csv  = pcodes_csv
         self._geojson     = geojson_path
 
-    # ------------------------------------------------------------------ #
     def format_rain_data(self):
         self.rain_df = pd.DataFrame(self._rain_data["result"]["records"])
 
@@ -32,25 +31,33 @@ class kenya_rain:
         self.rain_df["date"]        = pd.to_datetime(self.rain_df["date"], format="ISO8601")
         self.rain_df.dropna(inplace=True)
 
+        self.rain_df = self.rain_df.sort_values(["county_name", "date"])
+
+        self.rain_df["rfh"] = (
+            self.rain_df.groupby("county_name")["rfh"]
+            .transform(lambda x: x.rolling(window=10, min_periods=1).mean())
+        )
+
         self.agg_data = self.rain_df.groupby("county_name")[["rfh"]].mean()
 
     def rain_trend_plot(self, county: str) -> plt.Figure:
-        """Return a dark-themed line chart for *county*."""
+        """Return a dark-themed line chart for *county* using rolling values."""
         region = self.rain_df[self.rain_df["county_name"] == county]
 
         fig, ax = plt.subplots(figsize=(12, 5), facecolor=DARK_BG)
         ax.set_facecolor(PANEL_BG)
 
+        # Updated label to indicate rolling average
         sns.lineplot(data=region, x="date", y="rfh",
-                     label="Actual Rainfall", color=NEON_CYAN, linewidth=2, ax=ax)
+                     label="3-Period Rolling Rainfall", color=NEON_CYAN, linewidth=2, ax=ax)
         sns.lineplot(data=region, x="date", y="rfh_avg",
-                     label="Average Rainfall", color=NEON_PINK,
+                     label="LTA Average Rainfall", color=NEON_PINK,
                      linewidth=1.6, linestyle="--", ax=ax)
 
         ax.set_title(f"Rainfall Trends — {county}",
                      color="white", fontsize=16, fontweight="bold", pad=12)
         ax.set_xlabel("Date", color="#aaaacc")
-        ax.set_ylabel("10-day Rainfall (mm)", color="#aaaacc")
+        ax.set_ylabel("Rainfall (mm)", color="#aaaacc")
         ax.tick_params(colors="#aaaacc")
         ax.spines[:].set_color(GRID_COL)
         ax.grid(True, color=GRID_COL, linestyle="--", linewidth=0.6)
@@ -61,17 +68,16 @@ class kenya_rain:
         return fig
 
     def rain_bar_chart(self, top: bool = True) -> px.bar:
-        """Return a Plotly bar chart for the top-5 or bottom-5 counties."""
         subset = (self.agg_data.nlargest(5, "rfh")
                   if top else self.agg_data.nsmallest(5, "rfh"))
-        title  = ("Top 5 Counties by Rainfall" if top
-                  else "Bottom 5 Counties by Rainfall")
+        title  = ("Top 5 Counties" if top
+                  else "Bottom 5 Counties")
 
         fig = px.bar(
             subset,
             x=subset.index,
             y="rfh",
-            labels={"x": "County", "rfh": "10-day Rainfall (mm)"},
+            labels={"x": "County", "rfh": "Avg Rainfall (mm)"},
             title=title,
             color="rfh",
             color_continuous_scale=["#00f5ff", "#ff2d78"],
@@ -88,7 +94,6 @@ class kenya_rain:
         return fig
 
     def rain_map(self) -> px.choropleth_map:
-        """Return a Plotly choropleth map of average rainfall by county."""
         ke_counties = gpd.read_file(self._geojson)
 
         fig = px.choropleth_map(
@@ -103,7 +108,7 @@ class kenya_rain:
             zoom=5,
             center={"lat": -1.291, "lon": 36.8219},
             opacity=0.75,
-            title="Average 10-day Rainfall by County (mm)",
+            title="Avg Rainfall by County (mm)",
         )
         fig.update_layout(
             paper_bgcolor="#0d0d1a",
@@ -113,3 +118,4 @@ class kenya_rain:
             height=600,
         )
         return fig
+    

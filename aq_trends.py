@@ -27,6 +27,7 @@ class aq_trend:
         self._aq_data["value"]     = pd.to_numeric(self._aq_data["value"],     errors="coerce")
         self._aq_data["lat"]       = pd.to_numeric(self._aq_data["lat"],       errors="coerce")
         self._aq_data["timestamp"] = pd.to_datetime(self._aq_data["timestamp"], format="ISO8601")
+        self._aq_data = self._aq_data[self._aq_data['value'] <= 300]
 
     def sort_aq_index(self):
         self._aq_data.set_index("timestamp", inplace=True)
