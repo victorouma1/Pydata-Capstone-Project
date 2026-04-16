@@ -4,11 +4,6 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 
-
-# ---------------------------------------------------------------------------
-# Colour / label helpers shared by both classes
-# ---------------------------------------------------------------------------
-
 DARK_BG   = "#0d0d1a"
 PANEL_BG  = "#12122a"
 GRID_COL  = "#1e1e3a"
@@ -36,11 +31,6 @@ def _aqi_label(val: float) -> str:
             return label
     return "Hazardous  (225+)"
 
-
-# ---------------------------------------------------------------------------
-# County coordinate lookup (approximate centroids)
-# ---------------------------------------------------------------------------
-
 COUNTY_COORDS: dict[str, tuple[float, float]] = {
     "Nairobi": (-1.286, 36.817),
     "Kisumu":  (-0.092, 34.768),
@@ -50,10 +40,6 @@ COUNTY_COORDS: dict[str, tuple[float, float]] = {
     "Thika":   (-1.033, 37.069),
     "Ruiru":   (-1.157, 36.960),
 }
-
-# ---------------------------------------------------------------------------
-# AQCountyMap  — bubble map showing per-county average AQ
-# ---------------------------------------------------------------------------
 
 class AQCountyMap:
     """
@@ -66,7 +52,6 @@ class AQCountyMap:
         self._county_data: pd.DataFrame | None = None
         self._pollutant   = "P2"
 
-    # ------------------------------------------------------------------
     def load_and_aggregate(self, pollutant: str = "P2") -> None:
         """Read every CSV, filter by *pollutant*, compute the mean."""
         self._pollutant = pollutant
@@ -100,7 +85,6 @@ class AQCountyMap:
 
         self._county_data = pd.DataFrame(records)
 
-    # ------------------------------------------------------------------
     def plot_map(self) -> go.Figure:
         """Return a Plotly Figure with AQI-coloured bubbles per county."""
         df = self._county_data.copy()
@@ -108,7 +92,6 @@ class AQCountyMap:
         df["color"]     = df["avg"].apply(_aqi_color)
         df["aqi_label"] = df["avg"].apply(_aqi_label)
 
-        # Scale bubble size: range ≈ [35, 70] px so small values stay visible
         lo, hi = df["avg"].min(), df["avg"].max()
         span   = max(hi - lo, 1)
         df["size"] = 35 + 35 * (df["avg"] - lo) / span
@@ -141,7 +124,6 @@ class AQCountyMap:
             name="",
         )
 
-        # AQI legend as paper-space annotations (right side)
         annotations = [
             dict(
                 x=1.01, y=1.0 - i * 0.06,
@@ -181,10 +163,6 @@ class AQCountyMap:
 
         return go.Figure(data=[trace], layout=layout)
 
-
-# ---------------------------------------------------------------------------
-# AQMapTrend  — original date-slider map (kept for reference)
-# ---------------------------------------------------------------------------
 
 class AQMapTrend:
     def __init__(self, filepath: str):

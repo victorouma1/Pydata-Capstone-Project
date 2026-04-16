@@ -107,12 +107,10 @@ class UrbanisationPollution:
         import copy
         self._city_data = copy.deepcopy(CITY_DATA)
 
-    # ------------------------------------------------------------------
     def load_grids(self) -> None:
         self._l1_arr = self._load_tif(self._l1_tif)
         self._l2_arr = self._load_tif(self._l2_tif)
 
-    # ------------------------------------------------------------------
     def load_aq_data(self) -> None:
         """
         Read every county CSV, compute the actual mean and IQR for P2 (PM2.5)
@@ -121,7 +119,6 @@ class UrbanisationPollution:
         import pandas as pd
 
         for csv_path in self._county_csvs:
-            # Derive county name from filename: "Apr 2026 Nairobi.csv" → "Nairobi"
             county = Path(csv_path).stem.split()[-1]
             if county not in self._city_data:
                 continue
@@ -144,13 +141,11 @@ class UrbanisationPollution:
                              float(sub.quantile(0.75))),
                 }
 
-    # ------------------------------------------------------------------
     def make_figure(self, pollutant: str = "P2") -> plt.Figure:
         if self._l1_arr is None or self._l2_arr is None:
             raise RuntimeError("Call load_grids() before make_figure().")
         return self._build_figure(pollutant=pollutant)
 
-    # ------------------------------------------------------------------
     @staticmethod
     def _load_tif(path: Path) -> np.ndarray:
         return np.array(Image.open(path))
@@ -191,7 +186,6 @@ class UrbanisationPollution:
         for sp in ax.spines.values():
             sp.set_color(GRID_COL)
 
-    # ------------------------------------------------------------------
     def _build_figure(self, pollutant: str = "P2") -> plt.Figure:
         pm_key      = "pm25"  if pollutant == "P2" else "pm10"
         pm_label    = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
@@ -302,7 +296,6 @@ class UrbanisationPollution:
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         return fig
 
-    # ------------------------------------------------------------------
     @staticmethod
     def _bar_chart(ax, stats: dict, pollutant: str) -> None:
         labels  = [s["label"]  for s in stats.values()]

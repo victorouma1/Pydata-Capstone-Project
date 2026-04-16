@@ -138,10 +138,6 @@ hr { border-color: var(--border); }
 """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
-# Fixed file paths
-# ---------------------------------------------------------------------------
-
 TREND_CSV = "combined_6_months_nairobi.csv"
 
 COUNTY_CSV_FILES = [
@@ -156,11 +152,6 @@ COUNTY_CSV_FILES = [
 
 L1_TIF = "KEN_DUG_2026_GRID_L1_R2025A_v1.tif"
 L2_TIF = "KEN_DUG_2026_GRID_L2_R2025A_v1.tif"
-
-
-# ---------------------------------------------------------------------------
-# Sidebar
-# ---------------------------------------------------------------------------
 
 with st.sidebar:
     st.markdown(
@@ -184,19 +175,9 @@ with st.sidebar:
     pollutant = st.selectbox("Pollutant", ["P1", "P2"], index=1,
                              help="P1 = PM₁₀  |  P2 = PM₂.₅")
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 @st.cache_data(show_spinner=False)
 def load_aq_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep=";", low_memory=False)
-
-
-# ---------------------------------------------------------------------------
-# Page: Kenya AQ Map
-# ---------------------------------------------------------------------------
 
 if page == "Kenya AQ Map":
     pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
@@ -240,11 +221,6 @@ if page == "Kenya AQ Map":
             "Colour":         ["🟢", "🟡", "🟠", "🔴", "🟣", "⬛"],
         }
         st.table(pd.DataFrame(aqi_data))
-
-
-# ---------------------------------------------------------------------------
-# Page: AQ Trends  (always uses combined_6_months_nairobi.csv)
-# ---------------------------------------------------------------------------
 
 elif page == "AQ Trends":
     pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
@@ -291,11 +267,6 @@ elif page == "AQ Trends":
                     f"Pollutant `{pollutant}` not found in the dataset. "
                     "Check the pollutant selector in the sidebar."
                 )
-
-
-# ---------------------------------------------------------------------------
-# Page: Kenya Rainfall
-# ---------------------------------------------------------------------------
 
 elif page == "Kenya Rainfall":
     st.title("Kenya Rainfall Dashboard")
@@ -375,9 +346,6 @@ elif page == "Kenya Rainfall":
                 st.error(f"Map error: {e}. Ensure `kenyan-counties.geojson` is present.")
 
 
-# ---------------------------------------------------------------------------
-# Page: Urbanisation
-# ---------------------------------------------------------------------------
 
 elif page == "Urbanisation":
     pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
@@ -392,7 +360,6 @@ elif page == "Urbanisation":
     with col_run:
         run_urb = st.button("Generate Figure")
 
-    # Re-render when button pressed OR pollutant changes
     if run_urb or st.session_state.get("urb_pollutant") != pollutant:
         with st.spinner("Loading grids and computing statistics …"):
             try:
