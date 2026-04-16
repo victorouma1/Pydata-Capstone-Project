@@ -1,16 +1,3 @@
-"""
-urbanisation.py
-───────────────
-Module that visualises the relationship between degree of urbanisation
-(GHS-DUG DEGURBA) and air-quality pollution in Kenya.
-
-Inputs
-------
-l1_tif  : path to KEN_DUG_2026_GRID_L1_R2025A_v1.tif  (3-class DEGURBA)
-l2_tif  : path to KEN_DUG_2026_GRID_L2_R2025A_v1.tif  (9-class DEGURBA)
-aq_csv  : path to sensor CSV (optional; falls back to literature values)
-"""
-
 import warnings
 from pathlib import Path
 
@@ -22,19 +9,16 @@ from PIL import Image
 
 warnings.filterwarnings("ignore")
 
-# ── Colour palette ────────────────────────────────────────────────────────────
 DARK_BG   = "#0d0d1a"
 PANEL_BG  = "#12122a"
 GRID_COL  = "#1e1e3a"
 NEON_CYAN = "#00f5ff"
 NEON_PINK = "#ff2d78"
 
-# ── Raster extent (Kenya) ─────────────────────────────────────────────────────
 LAT_MAX, LAT_MIN =  5.02, -4.67
 LON_MIN, LON_MAX = 33.91, 41.91
 IMG_ROWS, IMG_COLS = 1209, 796
 
-# ── Class definitions ─────────────────────────────────────────────────────────
 L1_CLASSES = {
     1: ("Rural",         "#3a7d44"),
     2: ("Town / Suburb", "#f5a623"),
@@ -52,7 +36,63 @@ L2_CLASSES = {
     30: ("Major City Core",     "#ff2d78"),
 }
 
-# ── Fallback literature values ────────────────────────────────────────────────
+CITY_DATA = {
+    "Nairobi": {
+        "population":  4_397_073,   
+        "color":       "#ff2d78",  
+        "marker":      "o",
+        "urb_class":   3,          
+        "csv_key":     "nairobi",   
+        "pm25": {"median": 48.7, "iqr": (33.0, 70.2)},
+        "pm10": {"median": 96.4, "iqr": (65.0, 138.0)},
+    },
+    "Nakuru": {
+        "population":  2_162_202,   
+        "color":       "#f77f00",
+        "marker":      "s",
+        "urb_class":   2,
+        "csv_key":     "nakuru",
+        "pm25": {"median": 26.4, "iqr": (18.0, 38.5)},
+        "pm10": {"median": 52.1, "iqr": (36.0, 76.0)},
+    },
+    "Kiambu": {
+        "population":  2_417_735,   
+        "color":       "#9b59b6",
+        "marker":      "^",
+        "urb_class":   2,
+        "csv_key":     "kiambu",
+        "pm25": {"median": 22.0, "iqr": (15.0, 32.0)},
+        "pm10": {"median": 44.0, "iqr": (30.0, 64.0)},
+    },
+    "Meru": {
+        "population":  1_545_714,   
+        "color":       "#52b788",
+        "marker":      "D",
+        "urb_class":   2,
+        "csv_key":     "meru",
+        "pm25": {"median": 18.0, "iqr": (12.0, 26.0)},
+        "pm10": {"median": 36.0, "iqr": (24.0, 52.0)},
+    },
+    "Thika": {
+        "population":    279_748,   
+        "color":         "#f5a623",
+        "marker":        "P",
+        "urb_class":   2,
+        "csv_key":     "thika",
+        "pm25": {"median": 24.0, "iqr": (16.0, 35.0)},
+        "pm10": {"median": 48.0, "iqr": (32.0, 70.0)},
+    },
+    "Ruiru": {
+        "population":    475_900,  
+        "color":         "#00f5ff",
+        "marker":        "X",
+        "urb_class":   2,
+        "csv_key":     "ruiru",
+        "pm25": {"median": 28.0, "iqr": (19.0, 40.0)},
+        "pm10": {"median": 56.0, "iqr": (38.0, 80.0)},
+    },
+}
+
 LITERATURE_PM25 = {
     1: {"median": 12.1, "iqr": (8.0,  16.8),  "label": "Rural"},
     2: {"median": 26.4, "iqr": (18.0, 38.5),  "label": "Town / Suburb"},
@@ -66,21 +106,6 @@ LITERATURE_PM10 = {
 
 
 class UrbanisationPollution:
-    """
-    Encapsulates loading, processing, and plotting urbanisation vs. pollution.
-
-    Parameters
-    ----------
-    l1_tif : str | Path
-        Path to the Level-1 (3-class) GHS-DUG DEGURBA raster.
-    l2_tif : str | Path
-        Path to the Level-2 (9-class) GHS-DUG DEGURBA raster.
-    aq_csv : str | Path | None
-        Optional path to the sensor CSV (same semicolon-delimited format
-        used by the rest of the dashboard).  When *None* or the file is
-        missing, representative literature medians are used instead.
-    """
-
     def __init__(self, l1_tif: str | Path, l2_tif: str | Path,
                  aq_csv: str | Path | None = None):
         self._l1_tif = Path(l1_tif)
@@ -89,11 +114,14 @@ class UrbanisationPollution:
 
         self._l1_arr: np.ndarray | None = None
         self._l2_arr: np.ndarray | None = None
-        self._stats_pm25: dict = LITERATURE_PM25
-        self._stats_pm10: dict = LITERATURE_PM10
-        self.data_source: str  = "Literature-based representative medians (WHO/UNEP East Africa)"
 
-    # ── Public API ────────────────────────────────────────────────────────────
+        import copy
+        self._city_data = copy.deepcopy(CITY_DATA)
+
+        self.data_source: str = (
+            "Literature-based representative medians (WHO/UNEP East Africa, "
+            "Clean Air Fund 2023, REMA/HEI Africa)"
+        )
 
     def load_grids(self) -> None:
         """Load the L1 and L2 DEGURBA rasters from disk."""
@@ -101,40 +129,51 @@ class UrbanisationPollution:
         self._l2_arr = self._load_tif(self._l2_tif)
 
     def load_aq_data(self) -> None:
-        """
-        Load sensor CSV and compute per-class statistics.
-        If the CSV is absent, the instance keeps the literature fallback values.
-        """
         if self._aq_csv is None or not self._aq_csv.exists():
-            return  # keep defaults
+            return
 
         import pandas as pd
 
+        csv_stem = self._aq_csv.stem.lower()
+        matched_city = next(
+            (city for city, info in self._city_data.items()
+             if info["csv_key"] in csv_stem),
+            None,
+        )
+
         df = pd.read_csv(self._aq_csv, sep=";", low_memory=False)
         df["value"] = pd.to_numeric(df["value"], errors="coerce")
-        df["lat"]   = pd.to_numeric(df["lat"],   errors="coerce")
-        df["lon"]   = pd.to_numeric(df["lon"],   errors="coerce")
-        df.dropna(subset=["value", "lat", "lon"], inplace=True)
+        df.dropna(subset=["value"], inplace=True)
 
-        rows, cols = self._latlon_to_rowcol(df["lat"].values, df["lon"].values)
-        rows = np.clip(rows, 0, IMG_ROWS - 1)
-        cols = np.clip(cols, 0, IMG_COLS - 1)
+        updated_cities = []
 
-        df["urb_class"] = self._l1_arr[rows, cols]
-        df = df[df["urb_class"].isin(L1_CLASSES.keys())]
+        for ptype, pm_key in [("P2", "pm25"), ("P1", "pm10")]:
+            sub = df[df["value_type"] == ptype]["value"]
+            if len(sub) < 5:
+                continue
 
-        stats = self._class_stats(df)
-        self._stats_pm25 = stats.get("P2", LITERATURE_PM25)
-        self._stats_pm10 = stats.get("P1", LITERATURE_PM10)
-        self.data_source = f"Sensor CSV – {self._aq_csv.name}"
+            if matched_city:
+                self._city_data[matched_city][pm_key] = {
+                    "median": float(sub.median()),
+                    "iqr":    (float(sub.quantile(0.25)),
+                               float(sub.quantile(0.75))),
+                }
+                if matched_city not in updated_cities:
+                    updated_cities.append(matched_city)
+
+        if updated_cities:
+            self.data_source = (
+                f"Sensor CSV ({self._aq_csv.name}) for "
+                f"{', '.join(updated_cities)}; "
+                "literature medians for remaining cities"
+            )
 
     def make_figure(self) -> plt.Figure:
-        """Build and return the full urbanisation-vs-pollution figure."""
+        """Build and return the city population vs. pollution scatter figure."""
         if self._l1_arr is None or self._l2_arr is None:
             raise RuntimeError("Call load_grids() before make_figure().")
         return self._build_figure()
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _load_tif(path: Path) -> np.ndarray:
@@ -145,25 +184,6 @@ class UrbanisationPollution:
         row = (LAT_MAX - lat) / (LAT_MAX - LAT_MIN) * (IMG_ROWS - 1)
         col = (lon - LON_MIN) / (LON_MAX - LON_MIN) * (IMG_COLS - 1)
         return row.astype(int), col.astype(int)
-
-    @staticmethod
-    def _class_stats(df) -> dict:
-        results = {}
-        for ptype in ["P1", "P2"]:
-            sub = df[df["value_type"] == ptype]
-            stats = {}
-            for cls in sorted(L1_CLASSES.keys()):
-                vals = sub[sub["urb_class"] == cls]["value"]
-                if len(vals) < 5:
-                    continue
-                stats[cls] = {
-                    "median": float(vals.median()),
-                    "iqr":    (float(vals.quantile(0.25)), float(vals.quantile(0.75))),
-                    "label":  L1_CLASSES[cls][0],
-                    "n":      len(vals),
-                }
-            results[ptype] = stats
-        return results
 
     @staticmethod
     def _build_rgba(arr: np.ndarray, class_map: dict) -> np.ndarray:
@@ -195,6 +215,119 @@ class UrbanisationPollution:
         for sp in ax.spines.values():
             sp.set_color(GRID_COL)
 
+    def _build_figure(self) -> plt.Figure:
+            cities     = list(self._city_data.keys())
+            pops       = [self._city_data[c]["population"]        for c in cities]
+            pm25_meds  = [self._city_data[c]["pm25"]["median"]    for c in cities]
+            pm10_meds  = [self._city_data[c]["pm10"]["median"]    for c in cities]
+            colors     = [self._city_data[c]["color"]             for c in cities]
+            markers    = [self._city_data[c]["marker"]            for c in cities]
+
+            max_pop   = max(pops)
+            dot_sizes = [max(60, (p / max_pop) ** 0.5 * 500) for p in pops]
+
+            fig, ax = plt.subplots(figsize=(13, 7), facecolor=DARK_BG)
+            fig.suptitle(
+                "City Population vs. Air Pollution — Kenya 2019 Census",
+                color=NEON_CYAN, fontsize=16, fontweight="bold",
+                y=0.98, fontfamily="monospace",
+            )
+
+            ax.set_facecolor(PANEL_BG)
+            ax.spines[:].set_color(GRID_COL)
+            ax.grid(True, color=GRID_COL, linestyle="--", linewidth=0.5, zorder=0)
+
+            for city, x, y25, y10, col, mk, sz in zip(
+                    cities, pops, pm25_meds, pm10_meds, colors, markers, dot_sizes):
+                ax.scatter(x, y25, s=sz, color=col, marker=mk,
+                        edgecolors=NEON_CYAN, linewidths=1.5, zorder=4)
+                ax.scatter(x, y10, s=sz, color=col, marker=mk,
+                        edgecolors=NEON_PINK, linewidths=1.5, zorder=4,
+                        alpha=0.75)
+
+            label_offsets = {
+                "Nairobi": ( 0,  14),
+                "Nakuru":  (-30,  10),
+                "Kiambu":  ( 20,  10),
+                "Meru":    ( 0,  14),
+                "Thika":   (-30, -16),
+                "Ruiru":   ( 20, -16),
+            }
+            for city, x, y25 in zip(cities, pops, pm25_meds):
+                dx, dy = label_offsets.get(city, (0, 14))
+                ax.annotate(
+                    city,
+                    xy=(x, y25),
+                    xytext=(dx, dy),
+                    textcoords="offset points",
+                    ha="center", va="bottom",
+                    color="white", fontsize=9, fontweight="bold",
+                    arrowprops=dict(
+                        arrowstyle="-", color="#5a5a7a",
+                        lw=0.8, relpos=(0.5, 0),
+                    ) if dy < 0 else None,
+                )
+
+            ax.axhline(15, color=NEON_CYAN, linewidth=0.9, linestyle=":",
+                    alpha=0.6, label="WHO PM₂.₅ guideline (15 µg/m³)")
+            ax.axhline(45, color=NEON_PINK,  linewidth=0.9, linestyle=":",
+                    alpha=0.6, label="WHO PM₁₀  guideline (45 µg/m³)")
+
+            pm25_patch = mpatches.Patch(facecolor="none",
+                                        edgecolor=NEON_CYAN, linewidth=1.5,
+                                        label="PM₂.₅ median")
+            pm10_patch = mpatches.Patch(facecolor="none",
+                                        edgecolor=NEON_PINK, linewidth=1.5,
+                                        label="PM₁₀  median")
+            city_handles = [
+                mpatches.Patch(facecolor=self._city_data[c]["color"],
+                            label=f"{c} — pop. {self._city_data[c]['population']:,}")
+                for c in cities
+            ]
+            legend1 = ax.legend(
+                handles=[pm25_patch, pm10_patch],
+                loc="upper left", framealpha=0.25,
+                facecolor=PANEL_BG, edgecolor=GRID_COL,
+                labelcolor="white", fontsize=8,
+            )
+            ax.add_artist(legend1)
+            ax.legend(
+                handles=city_handles,
+                loc="upper right", framealpha=0.25,
+                facecolor=PANEL_BG, edgecolor=GRID_COL,
+                labelcolor="white", fontsize=7.5,
+                title="City", title_fontsize=8,
+            )
+
+            ax.set_xscale("log")
+            ax.set_xlabel(
+                "Population",
+                color="#aaaacc", fontsize=9,
+            )
+            ax.set_ylabel("Concentration (µg/m³)", color="#aaaacc", fontsize=9)
+            ax.tick_params(colors="#aaaacc")
+            ax.xaxis.set_major_formatter(
+                plt.FuncFormatter(lambda v, _: f"{int(v):,}")
+            )
+            ax.set_title(
+                "Population → Pollution Gradient  "
+                "(median  |  bubble size ∝ population)",
+                color="white", fontsize=10, fontweight="bold", pad=6,
+            )
+
+            fig.text(
+                0.01, 0.005,
+                f"Population: 2019 Kenya Population & Housing Census (KNBS)  |  "
+                f"Thika & Ruiru: sub-county estimates  |  "
+                f"Air Quality: {self.data_source}  |  "
+                f"Urbanisation: GHS-DUG DEGURBA R2025A v1",
+                color="#5a5a7a", fontsize=7, va="bottom",
+            )
+
+            fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+            return fig
+
+
     @staticmethod
     def _bar_chart(ax, stats: dict, pollutant: str) -> None:
         labels  = [s["label"]  for s in stats.values()]
@@ -224,131 +357,3 @@ class UrbanisationPollution:
                     bar.get_height() + 0.5,
                     f"{med:.1f}", ha="center", va="bottom",
                     color="white", fontsize=7, fontweight="bold")
-
-    def _build_figure(self) -> plt.Figure:
-        fig = plt.figure(figsize=(20, 13), facecolor=DARK_BG)
-        fig.suptitle(
-            "Urbanisation vs. Air Pollution — Kenya 2026",
-            color=NEON_CYAN, fontsize=19, fontweight="bold",
-            y=0.97, fontfamily="monospace",
-        )
-
-        gs = gridspec.GridSpec(
-            3, 3, figure=fig,
-            wspace=0.38, hspace=0.48,
-            left=0.05, right=0.97, top=0.92, bottom=0.06,
-        )
-
-        ax_l1   = fig.add_subplot(gs[0:2, 0])
-        ax_l2   = fig.add_subplot(gs[0:2, 1])
-        ax_pie  = fig.add_subplot(gs[0, 2])
-        ax_pm25 = fig.add_subplot(gs[1, 2])
-        ax_pm10 = fig.add_subplot(gs[2, 0])
-        ax_scat = fig.add_subplot(gs[2, 1:3])
-
-        # ── Maps ──────────────────────────────────────────────────────────────
-        rgba_l1 = self._build_rgba(self._l1_arr, L1_CLASSES)
-        self._style_map_ax(ax_l1,
-                           "Degree of Urbanisation — Level 1\n(GHS-DUG DEGURBA)",
-                           rgba_l1)
-        ax_l1.legend(
-            handles=[mpatches.Patch(color=col, label=lbl)
-                     for _, (lbl, col) in L1_CLASSES.items()],
-            loc="lower left", framealpha=0.25,
-            facecolor=PANEL_BG, edgecolor=GRID_COL,
-            labelcolor="white", fontsize=8,
-        )
-
-        rgba_l2 = self._build_rgba(self._l2_arr, L2_CLASSES)
-        self._style_map_ax(ax_l2,
-                           "Degree of Urbanisation — Level 2\n(GHS-DUG DEGURBA)",
-                           rgba_l2)
-        ax_l2.legend(
-            handles=[mpatches.Patch(color=col, label=lbl)
-                     for _, (lbl, col) in L2_CLASSES.items()],
-            loc="lower left", framealpha=0.25,
-            facecolor=PANEL_BG, edgecolor=GRID_COL,
-            labelcolor="white", fontsize=7,
-        )
-
-        # ── Pie ───────────────────────────────────────────────────────────────
-        counts = {k: (self._l1_arr == k).sum() for k in L1_CLASSES}
-        wedges, texts, autotexts = ax_pie.pie(
-            [counts[k] for k in L1_CLASSES],
-            labels=[L1_CLASSES[k][0] for k in L1_CLASSES],
-            colors=[L1_CLASSES[k][1] for k in L1_CLASSES],
-            autopct="%1.1f%%", startangle=140,
-            textprops=dict(color="white", fontsize=8),
-            wedgeprops=dict(edgecolor=DARK_BG, linewidth=1.5),
-            pctdistance=0.75,
-        )
-        for at in autotexts:
-            at.set_fontsize(8)
-            at.set_color(DARK_BG)
-            at.set_fontweight("bold")
-        ax_pie.set_facecolor(DARK_BG)
-        ax_pie.set_title("Land Area by\nUrbanisation Class",
-                         color="white", fontsize=10, fontweight="bold", pad=4)
-
-        # ── Bar charts ────────────────────────────────────────────────────────
-        self._bar_chart(ax_pm25, self._stats_pm25, "PM₂.₅")
-        self._bar_chart(ax_pm10, self._stats_pm10, "PM₁₀")
-
-        # ── Gradient scatter ──────────────────────────────────────────────────
-        ax_scat.set_facecolor(PANEL_BG)
-        ax_scat.spines[:].set_color(GRID_COL)
-        ax_scat.grid(True, color=GRID_COL, linestyle="--", linewidth=0.5, zorder=0)
-
-        cls_keys  = sorted(self._stats_pm25.keys())
-        xs        = np.arange(len(cls_keys))
-        pm25_meds = [self._stats_pm25[k]["median"] for k in cls_keys]
-        pm10_meds = [self._stats_pm10[k]["median"] for k in cls_keys]
-        pm25_lo   = [self._stats_pm25[k]["iqr"][0] for k in cls_keys]
-        pm25_hi   = [self._stats_pm25[k]["iqr"][1] for k in cls_keys]
-        pm10_lo   = [self._stats_pm10[k]["iqr"][0] for k in cls_keys]
-        pm10_hi   = [self._stats_pm10[k]["iqr"][1] for k in cls_keys]
-        xlabels   = [self._stats_pm25[k]["label"]  for k in cls_keys]
-
-        ax_scat.fill_between(xs, pm25_lo, pm25_hi, color=NEON_CYAN, alpha=0.15, zorder=1)
-        ax_scat.fill_between(xs, pm10_lo, pm10_hi, color=NEON_PINK,  alpha=0.15, zorder=1)
-        ax_scat.plot(xs, pm25_meds, "o-", color=NEON_CYAN, linewidth=2.2,
-                     markersize=8, zorder=3, label="PM₂.₅ median")
-        ax_scat.plot(xs, pm10_meds, "s-", color=NEON_PINK,  linewidth=2.2,
-                     markersize=8, zorder=3, label="PM₁₀  median")
-        ax_scat.axhline(15, color=NEON_CYAN, linewidth=0.9, linestyle=":",
-                        alpha=0.6, label="WHO PM₂.₅ guideline (15 µg/m³)")
-        ax_scat.axhline(45, color=NEON_PINK,  linewidth=0.9, linestyle=":",
-                        alpha=0.6, label="WHO PM₁₀  guideline (45 µg/m³)")
-
-        ax_scat.set_xticks(xs)
-        ax_scat.set_xticklabels(xlabels, color="#aaaacc", fontsize=9)
-        ax_scat.set_ylabel("Concentration (µg/m³)", color="#aaaacc", fontsize=9)
-        ax_scat.tick_params(colors="#aaaacc")
-        ax_scat.set_title(
-            "Urbanisation → Pollution Gradient  (median ± IQR)",
-            color="white", fontsize=10, fontweight="bold", pad=6,
-        )
-        ax_scat.legend(
-            loc="upper left", framealpha=0.2,
-            facecolor=PANEL_BG, edgecolor=GRID_COL,
-            labelcolor="white", fontsize=8,
-        )
-
-        for i in range(len(cls_keys) - 1):
-            uplift = pm25_meds[i + 1] - pm25_meds[i]
-            mid_x  = (xs[i] + xs[i + 1]) / 2
-            mid_y  = max(pm25_meds[i], pm25_meds[i + 1]) + 2
-            ax_scat.annotate(
-                f"+{uplift:.1f}",
-                xy=(mid_x, mid_y), ha="center", va="bottom",
-                color=NEON_CYAN, fontsize=9, fontweight="bold",
-            )
-
-        fig.text(
-            0.01, 0.005,
-            f"Urbanisation: GHS-DUG DEGURBA R2025A v1 (WorldPop)  |  "
-            f"Air Quality: {self.data_source}  |  Resolution: 1 km",
-            color="#5a5a7a", fontsize=7, va="bottom",
-        )
-
-        return fig
