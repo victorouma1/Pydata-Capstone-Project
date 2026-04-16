@@ -138,6 +138,30 @@ hr { border-color: var(--border); }
 """, unsafe_allow_html=True)
 
 
+# ---------------------------------------------------------------------------
+# Fixed file paths
+# ---------------------------------------------------------------------------
+
+TREND_CSV = "combined_6_months_nairobi.csv"
+
+COUNTY_CSV_FILES = [
+    "Sep 2019 Kisumu.csv",
+    "Oct 2024 Meru.csv",
+    "Apr 2026 Nairobi.csv",
+    "Apr 2026 Nakuru.csv",
+    "Mar 2025 Kiambu.csv",
+    "Jan 2021 Thika.csv",
+    "Mar 2023 Ruiru.csv",
+]
+
+L1_TIF = "KEN_DUG_2026_GRID_L1_R2025A_v1.tif"
+L2_TIF = "KEN_DUG_2026_GRID_L2_R2025A_v1.tif"
+
+
+# ---------------------------------------------------------------------------
+# Sidebar
+# ---------------------------------------------------------------------------
+
 with st.sidebar:
     st.markdown(
         "<h2 style='text-align:center;margin-bottom:0.2rem;'>AQ DASH</h2>",
@@ -160,50 +184,49 @@ with st.sidebar:
     pollutant = st.selectbox("Pollutant", ["P1", "P2"], index=1,
                              help="P1 = PM₁₀  |  P2 = PM₂.₅")
 
-    st.markdown("---")
-    st.markdown("**Data Source**")
-    csv_county = st.text_input(
-        "County name", value="nairobi",
-        help="e.g. nairobi, meru, kisumu"
-    ).strip().lower().replace(" ", "_")
-    csv_duration = st.radio("Duration", ["6 months", "Years"], horizontal=True)
-    if csv_duration == "6 months":
-        aq_csv = f"combined_6_months_{csv_county}.csv"
-    else:
-        csv_years = st.number_input("Number of years", min_value=1, max_value=20, value=1, step=1)
-        aq_csv = f"combined_{csv_years}_year_{csv_county}.csv"
-    st.caption(f"`{aq_csv}`")
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner=False)
 def load_aq_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep=";", low_memory=False)
 
+
+# ---------------------------------------------------------------------------
+# Page: Kenya AQ Map
+# ---------------------------------------------------------------------------
+
 if page == "Kenya AQ Map":
+    pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
     st.title("Kenya Air Quality Map")
-    st.markdown("Sensor readings across Kenya with a **date slider** to scrub through time.")
+    st.markdown(
+        f"Average **{pollutant_label}** concentration per county from sensor CSV data."
+    )
     st.markdown("---")
 
     col_load, _ = st.columns([1, 3])
     with col_load:
         run_map = st.button("Load / Refresh Map")
 
-    if run_map or st.session_state.get("map_fig") is not None:
-        with st.spinner("Crunching sensor data …"):
+    # Re-render whenever the button is pressed OR the pollutant changes
+    cache_key = f"county_map_{pollutant}"
+    if run_map or st.session_state.get("county_map_pollutant") != pollutant:
+        with st.spinner("Aggregating county sensor data …"):
             try:
-                df = load_aq_csv(aq_csv)
-                aq_map_obj = Map.AQMapTrend(aq_csv)
-                aq_map_obj.load_and_format()
-                aq_map_obj.aggregate(pollutant=pollutant)
-                fig = aq_map_obj.plot_map()
-                st.session_state["map_fig"] = fig
-            except FileNotFoundError:
-                st.error(f"CSV not found: `{aq_csv}`. Update the path in the sidebar.")
+                county_map = Map.AQCountyMap(COUNTY_CSV_FILES)
+                county_map.load_and_aggregate(pollutant=pollutant)
+                fig = county_map.plot_map()
+                st.session_state["county_map_fig"]      = fig
+                st.session_state["county_map_pollutant"] = pollutant
+            except Exception as e:
+                st.error(f"Error building map: {e}")
                 st.stop()
 
-    if "map_fig" in st.session_state:
+    if "county_map_fig" in st.session_state:
         st.plotly_chart(
-            st.session_state["map_fig"],
+            st.session_state["county_map_fig"],
             use_container_width=True,
             config={"scrollZoom": True},
         )
@@ -219,9 +242,16 @@ if page == "Kenya AQ Map":
         st.table(pd.DataFrame(aqi_data))
 
 
+# ---------------------------------------------------------------------------
+# Page: AQ Trends  (always uses combined_6_months_nairobi.csv)
+# ---------------------------------------------------------------------------
+
 elif page == "AQ Trends":
+    pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
     st.title("Air Quality Trends")
-    st.markdown("3-day rolling average overlaid on AQI colour bands.")
+    st.markdown(
+        f"3-day rolling average for **{pollutant_label}** overlaid on AQI colour bands — Nairobi."
+    )
     st.markdown("---")
 
     run_trend = st.button("Plot Trend")
@@ -229,7 +259,7 @@ elif page == "AQ Trends":
     if run_trend:
         with st.spinner("Processing …"):
             try:
-                df = load_aq_csv(aq_csv)
+                df = load_aq_csv(TREND_CSV)
                 trend = aqt.aq_trend(df, pollutant)
                 trend.arrange_format()
                 trend.sort_aq_index()
@@ -255,11 +285,17 @@ elif page == "AQ Trends":
                 c3.metric("Min",  f"{series.min():.1f} µg/m³")
 
             except FileNotFoundError:
-                st.error(f"CSV not found: `{aq_csv}`.")
+                st.error(f"CSV not found: `{TREND_CSV}`. Ensure it is in the working directory.")
             except KeyError:
-                st.error(f"Pollutant `{pollutant}` not found in the dataset. "
-                         "Check the pollutant selector in the sidebar.")
+                st.error(
+                    f"Pollutant `{pollutant}` not found in the dataset. "
+                    "Check the pollutant selector in the sidebar."
+                )
 
+
+# ---------------------------------------------------------------------------
+# Page: Kenya Rainfall
+# ---------------------------------------------------------------------------
 
 elif page == "Kenya Rainfall":
     st.title("Kenya Rainfall Dashboard")
@@ -339,55 +375,41 @@ elif page == "Kenya Rainfall":
                 st.error(f"Map error: {e}. Ensure `kenyan-counties.geojson` is present.")
 
 
+# ---------------------------------------------------------------------------
+# Page: Urbanisation
+# ---------------------------------------------------------------------------
+
 elif page == "Urbanisation":
+    pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
     st.title("Urbanisation & Air Pollution")
     st.markdown(
-        "Visualises how the **degree of urbanisation** (GHS-DUG DEGURBA 2026) "
-        "relates to PM₂.₅ and PM₁₀ concentrations across Kenya."
+        f"Visualises how the **degree of urbanisation** (GHS-DUG DEGURBA 2026) "
+        f"relates to **{pollutant_label}** concentrations across Kenya."
     )
     st.markdown("---")
-
-    with st.sidebar:
-        st.markdown("---")
-        st.markdown("**Urbanisation Settings**")
-        l1_path = st.text_input(
-            "L1 raster path",
-            value="KEN_DUG_2026_GRID_L1_R2025A_v1.tif",
-            help="3-class DEGURBA GeoTIFF",
-        )
-        l2_path = st.text_input(
-            "L2 raster path",
-            value="KEN_DUG_2026_GRID_L2_R2025A_v1.tif",
-            help="9-class DEGURBA GeoTIFF",
-        )
-        use_sensor_aq = st.checkbox(
-            "Use sensor AQ data", value=True,
-            help="When checked, the currently selected CSV is matched to the raster. "
-                 "Uncheck to use literature reference values instead.",
-        )
 
     col_run, _ = st.columns([1, 3])
     with col_run:
         run_urb = st.button("Generate Figure")
 
-    if run_urb:
-        aq_path_for_urb = aq_csv if use_sensor_aq else None
+    # Re-render when button pressed OR pollutant changes
+    if run_urb or st.session_state.get("urb_pollutant") != pollutant:
         with st.spinner("Loading grids and computing statistics …"):
             try:
                 urb_obj = urb.UrbanisationPollution(
-                    l1_tif=l1_path,
-                    l2_tif=l2_path,
-                    aq_csv=aq_path_for_urb,
+                    l1_tif=L1_TIF,
+                    l2_tif=L2_TIF,
+                    county_csvs=COUNTY_CSV_FILES,
                 )
                 urb_obj.load_grids()
                 urb_obj.load_aq_data()
-                fig = urb_obj.make_figure()
-                st.session_state["urb_fig"] = fig
-                st.session_state["urb_source"] = urb_obj.data_source
+                fig = urb_obj.make_figure(pollutant=pollutant)
+                st.session_state["urb_fig"]      = fig
+                st.session_state["urb_pollutant"] = pollutant
             except FileNotFoundError as e:
                 st.error(
                     f"Raster file not found: {e}. "
-                    "Check the L1/L2 paths in the Urbanisation Settings above."
+                    "Ensure the GeoTIFF files are in the working directory."
                 )
                 st.stop()
             except Exception as e:
@@ -396,9 +418,6 @@ elif page == "Urbanisation":
 
     if "urb_fig" in st.session_state:
         st.pyplot(st.session_state["urb_fig"], use_container_width=True)
-
-        src = st.session_state.get("urb_source", "")
-        st.caption(f"**Data source:** {src}")
         st.markdown("---")
 
         st.markdown("""

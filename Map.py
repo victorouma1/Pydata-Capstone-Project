@@ -1,6 +1,190 @@
+import re
+from pathlib import Path
+
 import pandas as pd
 import plotly.graph_objects as go
 
+
+# ---------------------------------------------------------------------------
+# Colour / label helpers shared by both classes
+# ---------------------------------------------------------------------------
+
+DARK_BG   = "#0d0d1a"
+PANEL_BG  = "#12122a"
+GRID_COL  = "#1e1e3a"
+
+_AQI_BANDS = [
+    (9,     "#00e400", "Good  (0–9)"),
+    (35.4,  "#ffff00", "Moderate  (9–35)"),
+    (55.4,  "#ff7e00", "Unhealthy — Sensitive  (35–55)"),
+    (125.4, "#ff0000", "Unhealthy  (55–125)"),
+    (225.4, "#8f3f97", "Very Unhealthy  (125–225)"),
+    (float("inf"), "#7e0023", "Hazardous  (225+)"),
+]
+
+
+def _aqi_color(val: float) -> str:
+    for threshold, col, _ in _AQI_BANDS:
+        if val <= threshold:
+            return col
+    return "#7e0023"
+
+
+def _aqi_label(val: float) -> str:
+    for threshold, _, label in _AQI_BANDS:
+        if val <= threshold:
+            return label
+    return "Hazardous  (225+)"
+
+
+# ---------------------------------------------------------------------------
+# County coordinate lookup (approximate centroids)
+# ---------------------------------------------------------------------------
+
+COUNTY_COORDS: dict[str, tuple[float, float]] = {
+    "Nairobi": (-1.286, 36.817),
+    "Kisumu":  (-0.092, 34.768),
+    "Meru":    ( 0.047, 37.649),
+    "Nakuru":  (-0.303, 36.080),
+    "Kiambu":  (-1.031, 36.831),
+    "Thika":   (-1.033, 37.069),
+    "Ruiru":   (-1.157, 36.960),
+}
+
+# ---------------------------------------------------------------------------
+# AQCountyMap  — bubble map showing per-county average AQ
+# ---------------------------------------------------------------------------
+
+class AQCountyMap:
+    """
+    Loads one CSV per county, computes the average concentration for the
+    selected pollutant, then renders a Plotly bubble map with a dark theme.
+    """
+
+    def __init__(self, csv_files: list[str]):
+        self._csv_files   = csv_files
+        self._county_data: pd.DataFrame | None = None
+        self._pollutant   = "P2"
+
+    # ------------------------------------------------------------------
+    def load_and_aggregate(self, pollutant: str = "P2") -> None:
+        """Read every CSV, filter by *pollutant*, compute the mean."""
+        self._pollutant = pollutant
+        records: list[dict] = []
+
+        for fp in self._csv_files:
+            county = Path(fp).stem.split()[-1]   # "Apr 2026 Nairobi" → "Nairobi"
+            if county not in COUNTY_COORDS:
+                continue
+
+            try:
+                df = pd.read_csv(fp, sep=";", low_memory=False)
+            except FileNotFoundError:
+                continue
+
+            df["value"] = pd.to_numeric(df["value"], errors="coerce")
+            sub = df[df["value_type"] == pollutant]["value"].dropna()
+            if sub.empty:
+                continue
+
+            avg = float(sub.mean())
+            records.append(
+                dict(
+                    county=county,
+                    avg=avg,
+                    lat=COUNTY_COORDS[county][0],
+                    lon=COUNTY_COORDS[county][1],
+                    n=len(sub),
+                )
+            )
+
+        self._county_data = pd.DataFrame(records)
+
+    # ------------------------------------------------------------------
+    def plot_map(self) -> go.Figure:
+        """Return a Plotly Figure with AQI-coloured bubbles per county."""
+        df = self._county_data.copy()
+
+        df["color"]     = df["avg"].apply(_aqi_color)
+        df["aqi_label"] = df["avg"].apply(_aqi_label)
+
+        # Scale bubble size: range ≈ [35, 70] px so small values stay visible
+        lo, hi = df["avg"].min(), df["avg"].max()
+        span   = max(hi - lo, 1)
+        df["size"] = 35 + 35 * (df["avg"] - lo) / span
+
+        hover = df.apply(
+            lambda r: (
+                f"<b>{r['county']}</b><br>"
+                f"{self._pollutant}: {r['avg']:.1f} µg/m³<br>"
+                f"AQI: {r['aqi_label']}<br>"
+                f"Readings: {int(r['n']):,}"
+            ),
+            axis=1,
+        )
+
+        trace = go.Scattermap(
+            lat=df["lat"],
+            lon=df["lon"],
+            mode="markers+text",
+            marker=dict(
+                size=df["size"],
+                color=df["color"],
+                opacity=0.88,
+                sizemode="diameter",
+            ),
+            text=df["avg"].apply(lambda x: f"{x:.0f}"),
+            textposition="middle center",
+            textfont=dict(color="white", size=13, family="Space Mono, monospace"),
+            hovertext=hover,
+            hoverinfo="text",
+            name="",
+        )
+
+        # AQI legend as paper-space annotations (right side)
+        annotations = [
+            dict(
+                x=1.01, y=1.0 - i * 0.06,
+                xref="paper", yref="paper",
+                text=f'<span style="color:{col};">■</span>  {lbl}',
+                showarrow=False, align="left",
+                font=dict(size=10, color="white"),
+                xanchor="left",
+            )
+            for i, (_, col, lbl) in enumerate(_AQI_BANDS)
+        ]
+
+        pollutant_label = "PM₂.₅" if self._pollutant == "P2" else "PM₁₀"
+        layout = go.Layout(
+            title=dict(
+                text=f"Kenya Average Air Quality by County — {pollutant_label} ({self._pollutant})",
+                font=dict(color="white", size=17),
+            ),
+            paper_bgcolor=DARK_BG,
+            plot_bgcolor=PANEL_BG,
+            mapbox=dict(
+                style="carto-darkmatter",
+                center=dict(lat=-0.5, lon=37.0),
+                zoom=5.2,
+            ),
+            margin=dict(l=0, r=230, t=60, b=0),
+            height=680,
+            annotations=annotations,
+            font=dict(color="white", family="Space Mono, monospace"),
+            hoverlabel=dict(
+                bgcolor=PANEL_BG,
+                bordercolor="#00f5ff",
+                font_color="white",
+                font_family="Space Mono, monospace",
+            ),
+        )
+
+        return go.Figure(data=[trace], layout=layout)
+
+
+# ---------------------------------------------------------------------------
+# AQMapTrend  — original date-slider map (kept for reference)
+# ---------------------------------------------------------------------------
 
 class AQMapTrend:
     def __init__(self, filepath: str):
@@ -30,34 +214,12 @@ class AQMapTrend:
         )
         self.__daily_data["date_str"] = self.__daily_data["date"].astype(str)
 
-    @staticmethod
-    def _aqi_color(val: float) -> str:
-        if val <= 9:     return "#00e400"
-        if val <= 35.4:  return "#ffff00"
-        if val <= 55.4:  return "#ff7e00"
-        if val <= 125.4: return "#ff0000"
-        if val <= 225.4: return "#8f3f97"
-        return "#7e0023"
-
-    @staticmethod
-    def _aqi_label(val: float) -> str:
-        if val <= 9:     return "Good"
-        if val <= 35.4:  return "Moderate"
-        if val <= 55.4:  return "Unhealthy for Sensitive Groups"
-        if val <= 125.4: return "Unhealthy"
-        if val <= 225.4: return "Very Unhealthy"
-        return "Hazardous"
-
     def plot_map(self, output_html: str | None = None) -> go.Figure:
-        """
-        Return a Plotly Figure with a date slider.
-        Optionally also saves to *output_html* if a path is given.
-        """
         df    = self.__daily_data.copy()
         dates = sorted(df["date_str"].unique())
 
-        df["color"]     = df["concentration"].apply(self._aqi_color)
-        df["aqi_label"] = df["concentration"].apply(self._aqi_label)
+        df["color"]     = df["concentration"].apply(_aqi_color)
+        df["aqi_label"] = df["concentration"].apply(_aqi_label)
 
         traces = []
         for date in dates:
@@ -103,20 +265,12 @@ class AQMapTrend:
                               font=dict(color="#00f5ff", size=14)),
             pad=dict(t=55),
             steps=steps,
-            bgcolor="#12122a",
+            bgcolor=PANEL_BG,
             bordercolor="#00f5ff",
             tickcolor="#aaaacc",
             font=dict(color="white", size=10),
         )]
 
-        aqi_legend = [
-            ("#00e400", "Good  (0–9)"),
-            ("#ffff00", "Moderate  (9–35)"),
-            ("#ff7e00", "Unhealthy — Sensitive  (35–55)"),
-            ("#ff0000", "Unhealthy  (55–125)"),
-            ("#8f3f97", "Very Unhealthy  (125–225)"),
-            ("#7e0023", "Hazardous  (225+)"),
-        ]
         annotations = [
             dict(
                 x=1.01, y=1.0 - idx * 0.048,
@@ -126,7 +280,7 @@ class AQMapTrend:
                 font=dict(size=11, color="white"),
                 xanchor="left",
             )
-            for idx, (col, lbl) in enumerate(aqi_legend)
+            for idx, (_, col, lbl) in enumerate(_AQI_BANDS)
         ]
 
         layout = go.Layout(
@@ -134,8 +288,8 @@ class AQMapTrend:
                 text=f"Nairobi Air Quality — {self.__pollutant} — {dates[0]}",
                 font=dict(color="white", size=17),
             ),
-            paper_bgcolor="#0d0d1a",
-            plot_bgcolor="#12122a",
+            paper_bgcolor=DARK_BG,
+            plot_bgcolor=PANEL_BG,
             mapbox=dict(
                 style="carto-darkmatter",
                 center=dict(lat=-1.286, lon=36.817),
@@ -149,19 +303,6 @@ class AQMapTrend:
         )
 
         fig = go.Figure(data=traces, layout=layout)
-
         if output_html:
             fig.write_html(output_html)
-
         return fig
-
-
-if __name__ == "__main__":
-    import sys
-    filepath  = sys.argv[1] if len(sys.argv) > 1 else "combined_6_months_nairobi.csv"
-    pollutant = sys.argv[2] if len(sys.argv) > 2 else "P2"
-
-    m = AQMapTrend(filepath)
-    m.load_and_format()
-    m.aggregate(pollutant=pollutant)
-    m.plot_map(output_html="aq_map.html").show()
