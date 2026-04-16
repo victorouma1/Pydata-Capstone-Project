@@ -1,8 +1,3 @@
-"""
-AQ & Rainfall Dashboard — Streamlit entry point
-Run:  streamlit run main.py
-"""
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -156,7 +151,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["Kenya AQ Map", "AQ Trends", "Kenya Rainfall", "Urbanisation"],
+        ["Kenya AQ Map", "AQ Trends", "Urbanisation", "Kenya Rainfall"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -184,10 +179,6 @@ with st.sidebar:
 def load_aq_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep=";", low_memory=False)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Page: Kenya AQ Map
-# ══════════════════════════════════════════════════════════════════════════════
 if page == "Kenya AQ Map":
     st.title("Kenya Air Quality Map")
     st.markdown("Sensor readings across Kenya with a **date slider** to scrub through time.")
@@ -228,9 +219,6 @@ if page == "Kenya AQ Map":
         st.table(pd.DataFrame(aqi_data))
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Page: AQ Trends
-# ══════════════════════════════════════════════════════════════════════════════
 elif page == "AQ Trends":
     st.title("Air Quality Trends")
     st.markdown("3-day rolling average overlaid on AQI colour bands.")
@@ -273,9 +261,6 @@ elif page == "AQ Trends":
                          "Check the pollutant selector in the sidebar.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Page: Kenya Rainfall
-# ══════════════════════════════════════════════════════════════════════════════
 elif page == "Kenya Rainfall":
     st.title("Kenya Rainfall Dashboard")
     st.markdown("County-level rainfall data sourced from OCHA/Humdata.")
@@ -354,9 +339,6 @@ elif page == "Kenya Rainfall":
                 st.error(f"Map error: {e}. Ensure `kenyan-counties.geojson` is present.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Page: Urbanisation
-# ══════════════════════════════════════════════════════════════════════════════
 elif page == "Urbanisation":
     st.title("Urbanisation & Air Pollution")
     st.markdown(
