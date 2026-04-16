@@ -34,13 +34,15 @@ Air quality index is calculated using:<br>
 In the dataset note that P0 in the data represents PM1, P2 represents PM2.5, and P1 represents PM10<br>
 
 ### Research Questions
-Which regions in Kenya have the highest pollution levels? <br>
+Is there a correlation between population and pollution? <br>
+How has air quality changed over time in Nairobi?<br>
 How does rainfall vary across counties over time? <br>
-Is there a relationship between urbanization and pollution? <br>
-Which areas are most vulnerable to climate extremes? <br>
+Which counites are most vulnerable/beneficial to climate extremes? <br>
 
 ### Tools and libraries
 Pandas<br>
 Geopandas<br>
 Matplotlib<br>
 Numpy<br>
+Seaborn<br>
+Geopandas<br>
