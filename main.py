@@ -166,7 +166,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigate",
-        ["Kenya AQ Map", "AQ Trends", "Urbanisation", "Kenya Rainfall"],
+        ["Overview", "Kenya AQ Map", "AQ Trends", "Urbanisation", "Kenya Rainfall", "Recommendations", "References"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -179,7 +179,73 @@ with st.sidebar:
 def load_aq_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path, sep=";", low_memory=False)
 
-if page == "Kenya AQ Map":
+if page == "Overview":
+    st.title("AQ & Rainfall Dashboard")
+    st.markdown("##### Air Quality & Climate Intelligence for Kenya")
+    st.markdown("---")
+
+    st.markdown("## Problem Statement")
+    st.markdown("""
+According to the Clean Air Fund's 2020 *State of the Global Air* report, more than **5,000 premature deaths** 
+in Nairobi are linked to air pollution-related illnesses. Additionally, over **two million people** across Kenya 
+faced worsened food insecurity following one of the driest October–December 2025 rainy seasons on record.
+""")
+
+    st.markdown("---")
+    st.markdown("## Research Questions")
+
+    questions = [
+        ("🗺️", "Does geographical location play a part in air quality?"),
+        ("👥", "Is there a correlation between population and pollution?"),
+        ("📈", "How has air quality changed over time in Nairobi?"),
+        ("🌧️", "How does rainfall vary across counties over time?"),
+        ("⚠️", "Which counties are most vulnerable or beneficial to climate extremes?"),
+    ]
+    for icon, q in questions:
+        st.markdown(
+            f"""
+<div style="background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--neon-cyan);
+border-radius:6px;padding:0.75rem 1rem;margin-bottom:0.6rem;font-family:'Space Mono',monospace;
+color:var(--text-main);font-size:0.85rem;">{icon}&nbsp;&nbsp;{q}</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown("## Data Sources")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(
+            """
+<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1.2rem;height:100%;">
+<h3 style="color:var(--neon-cyan)!important;font-size:0.9rem;margin-bottom:0.5rem;">📡 Sensors Africa</h3>
+<p style="color:var(--text-muted);font-size:0.8rem;margin:0;">Air quality sensor readings used for PM&#x2081;&#x2080; and PM&#x2082;.&#x2085;
+concentration data across Kenyan counties.</p>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+    with col2:
+        st.markdown(
+            """
+<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1.2rem;height:100%;">
+<h3 style="color:var(--neon-pink)!important;font-size:0.9rem;margin-bottom:0.5rem;">🌧️ Humdata (OCHA)</h3>
+<p style="color:var(--text-muted);font-size:0.8rem;margin:0;">County-level rainfall records sourced from the
+UN OCHA Humanitarian Data Exchange platform.</p>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown(
+        "<p style='color:var(--text-muted);font-size:0.78rem;text-align:center;'>"
+        "Use the sidebar to navigate between sections of the dashboard.</p>",
+        unsafe_allow_html=True,
+    )
+
+elif page == "Kenya AQ Map":
     pollutant_label = "PM₂.₅" if pollutant == "P2" else "PM₁₀"
     st.title("Kenya Air Quality Map")
     st.markdown(
@@ -412,3 +478,96 @@ elif page == "Urbanisation":
                 ],
             }
             st.table(pd.DataFrame(cls_data))
+elif page == "Recommendations":
+    st.title("Recommendations")
+    st.markdown("Policy and intervention recommendations derived from the dashboard findings.")
+    st.markdown("---")
+
+    st.markdown("## Air Quality")
+
+    def rec_card(title, body, accent="var(--neon-cyan)"):
+        st.markdown(
+            f"""
+<div style="background:var(--panel);border:1px solid var(--border);border-left:4px solid {accent};
+border-radius:8px;padding:1.1rem 1.3rem;margin-bottom:1rem;">
+<p style="color:{accent};font-family:'Orbitron',monospace;font-size:0.8rem;
+letter-spacing:0.06em;margin:0 0 0.5rem 0;">{title}</p>
+<p style="color:var(--text-muted);font-family:'Space Mono',monospace;font-size:0.82rem;
+line-height:1.6;margin:0;">{body}</p>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    rec_card(
+        "DECENTRALISE ENVIRONMENTAL MONITORING",
+        "Most Green City initiatives focus on Nairobi. However, the data shows Ruiru and Thika are the "
+        "real hotspots. Capitalise on this by shifting policy focus toward industrial regulation in these "
+        "satellite manufacturing hubs.",
+        "var(--neon-cyan)",
+    )
+
+    rec_card(
+        "TARGETED INDUSTRIAL FILTERING",
+        "Since Thika and Ruiru are industrial corridors, the high PM10 is likely due to manufacturing "
+        "and construction dust. Implementing stricter scrubber requirements for factories in these specific "
+        "zones would yield the highest return on intervention.",
+        "var(--neon-cyan)",
+    )
+
+    st.markdown("---")
+    st.markdown("## Rainfall")
+
+    rec_card(
+        "HIGH-RAINFALL AREAS — COLD-CHAIN & DRAINAGE",
+        "For areas with high rainfall, capitalise on high yields by investing in cold-chain storage to "
+        "prevent post-harvest loss during heavy rains. Focus on drainage infrastructure to prevent the "
+        "landslides common in hilly terrains.",
+        "var(--neon-pink)",
+    )
+
+    rec_card(
+        "LOW-RAINFALL AREAS — SOLAR & DROUGHT-RESISTANT CROPS",
+        "Low-rainfall areas are likely high in solar radiation. Capitalise on the lack of rain by deploying "
+        "solar-powered boreholes and shifting toward drought-resistant fodder for livestock.",
+        "var(--neon-pink)",
+    )
+
+elif page == "References":
+    st.title("References")
+    st.markdown("Sources and citations used throughout this dashboard.")
+    st.markdown("---")
+
+    references = [
+        ("[1]", "Clean Air Fund", "Nairobi and Air Pollution — State of the Global Air 2020.", "https://www.cleanairfund.org"),
+        ("[2]", "Kenya Meteorological Society", "Climate Outlook for the Long Rains (March-May) 2026 Season and Review of the October-December 2025 Short Rains Season.", "https://www.meteo.go.ke"),
+        ("[3]", "OCHA / Humdata", "Kenya County-Level Rainfall Dataset. Humanitarian Data Exchange.", "https://data.humdata.org"),
+        ("[4]", "IUCN", "Kenya Arid and Semi-Arid Lands (ASAL) — Environmental Profile.", "https://www.iucn.org"),
+        ("[5]", "European Commission JRC / WorldPop", "GHS-DUG DEGURBA 2026 Grid R2025A v1 — Global Human Settlement Degree of Urbanisation.", "https://ghsl.jrc.ec.europa.eu"),
+        ("[6]", "Sensors Africa", "Open air quality sensor network data for Kenya.", "https://sensors.africa")
+    ]
+
+    for num, source, title, url in references:
+        st.markdown(
+            f"""
+<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;
+padding:0.85rem 1.1rem;margin-bottom:0.7rem;display:flex;gap:1rem;align-items:flex-start;">
+<span style="color:var(--neon-cyan);font-family:'Orbitron',monospace;font-size:0.78rem;
+min-width:2.5rem;padding-top:2px;">{num}</span>
+<div>
+<p style="color:var(--text-main);font-family:'Space Mono',monospace;font-size:0.82rem;
+margin:0 0 0.2rem 0;"><strong>{source}</strong> — {title}</p>
+<a href="{url}" target="_blank" style="color:var(--text-muted);font-size:0.75rem;
+font-family:'Space Mono',monospace;text-decoration:none;">{url}</a>
+</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown(
+        "<p style='color:var(--text-muted);font-size:0.75rem;text-align:center;'>"
+        "Placeholder references [7] and [8] are to be replaced with your actual citations.</p>",
+        unsafe_allow_html=True,
+    )
