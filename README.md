@@ -34,6 +34,7 @@ Air quality index is calculated using:<br>
 In the dataset note that P0 in the data represents PM1, P2 represents PM2.5, and P1 represents PM10<br>
 
 ### Research Questions
+Does Geographical location play a part in air quality? <br>
 Is there a correlation between population and pollution? <br>
 How has air quality changed over time in Nairobi?<br>
 How does rainfall vary across counties over time? <br>
